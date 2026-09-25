@@ -1,11 +1,13 @@
 package com.kholkins.englishinterlocutor.presentation.speech
 
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kholkins.englishinterlocutor.core.presentation.BaseViewModel
 import com.kholkins.englishinterlocutor.domain.model.SpeechRecognitionEvent
+import com.kholkins.englishinterlocutor.domain.model.TranslateState
 import com.kholkins.englishinterlocutor.domain.usecase.ObserveSpeechRecognitionUseCase
 import com.kholkins.englishinterlocutor.domain.usecase.StartSpeechRecognitionUseCase
 import com.kholkins.englishinterlocutor.domain.usecase.StopSpeechRecognitionUseCase
+import com.kholkins.englishinterlocutor.domain.usecase.TranslateEnToRuUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,7 +19,8 @@ class SpeechViewModel(
     observeSpeechRecognitionUseCase: ObserveSpeechRecognitionUseCase,
     private val startSpeechRecognitionUseCase: StartSpeechRecognitionUseCase,
     private val stopSpeechRecognitionUseCase: StopSpeechRecognitionUseCase,
-) : ViewModel() {
+    private val translateEnToRuUseCase: TranslateEnToRuUseCase
+) : BaseViewModel() {
 
     private val _uiState = MutableStateFlow(SpeechUiState())
     val uiState: StateFlow<SpeechUiState> = _uiState.asStateFlow()
@@ -54,12 +57,15 @@ class SpeechViewModel(
                     isListening = true,
                     partialText = event.text,
                 )
-                is SpeechRecognitionEvent.FinalResult -> current.copy(
-                    isListening = false,
-                    recognizedText = event.text,
-                    partialText = "",
-                    errorMessage = null,
-                )
+                is SpeechRecognitionEvent.FinalResult -> {
+                    translateEnToRu(event.text)
+                    current.copy(
+                        isListening = false,
+                        recognizedText = event.text,
+                        partialText = "",
+                        errorMessage = null,
+                    )
+                }
                 is SpeechRecognitionEvent.Error -> current.copy(
                     isListening = false,
                     partialText = "",
@@ -67,5 +73,33 @@ class SpeechViewModel(
                 )
             }
         }
+    }
+
+    private fun translateEnToRu(text: String){
+        runFlowUseCase(
+            useCase = translateEnToRuUseCase,
+            params = text,
+            onEach = { translatedState ->
+                when (translatedState) {
+                    is TranslateState.Success -> {
+                        _uiState.update { current ->
+                            current.copy(
+                                translatedText = translatedState.text
+                            )
+                        }
+                    }
+                    is TranslateState.Error -> {
+                        _uiState.update { current ->
+                            current.copy(
+                                errorMessage = translatedState.message
+                            )
+                        }
+                    }
+                    is TranslateState.Loading -> {}
+                }
+
+            },
+            onError = {}
+        )
     }
 }

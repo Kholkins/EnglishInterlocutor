@@ -8,7 +8,7 @@ fun initKoin(appDeclaration: KoinAppDeclaration = {}) {
     try {
         startKoin {
             appDeclaration()
-            modules(appModules + platformDataModule)
+            modules(appModules + platformDataModule + commonModule)
         }
     } catch (_: KoinApplicationAlreadyStartedException) {
         // Already initialized (e.g. configuration change on Android)
