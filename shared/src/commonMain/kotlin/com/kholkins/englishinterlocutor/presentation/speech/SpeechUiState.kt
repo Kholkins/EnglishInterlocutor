@@ -4,5 +4,6 @@ data class SpeechUiState(
     val isListening: Boolean = false,
     val recognizedText: String = "",
     val partialText: String = "",
+    val translatedText: String = "",
     val errorMessage: String? = null,
 )
