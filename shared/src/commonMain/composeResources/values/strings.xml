@@ -1,0 +1,11 @@
+<!-- commonMain/composeResources/values/strings.xml -->
+<resources>
+    <string name="app_name">My Application</string>
+    <string name="speech_screen_name">English speech</string>
+    <string name="listening_message">Прослушивание…</string>
+    <string name="hold_button">Нажми на кнопку и говори по-английски</string>
+    <string name="blank_text_message">Здесь появится распознанный текст</string>
+    <string name="translation_text_message">Здесь появится перевод</string>
+    <string name="release_to_finish">Отпустите, чтобы закончить</string>
+    <string name="hold_to_speak">Зажми и говори</string>
+</resources>
