@@ -22,7 +22,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Clean and build Android app
-        run: ./gradlew --stop clean :androidApp:assembleDebug
+        run: ./gradlew clean :androidApp:assembleDebug
 
       - name: Run unit tests
         run: ./gradlew :shared:testAndroid :androidApp:test
