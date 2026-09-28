@@ -8,6 +8,7 @@ import com.kholkins.englishinterlocutor.domain.usecase.ObserveSpeechRecognitionU
 import com.kholkins.englishinterlocutor.domain.usecase.StartSpeechRecognitionUseCase
 import com.kholkins.englishinterlocutor.domain.usecase.StopSpeechRecognitionUseCase
 import com.kholkins.englishinterlocutor.domain.usecase.TranslateEnToRuUseCase
+import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,11 +20,13 @@ class SpeechViewModel(
     observeSpeechRecognitionUseCase: ObserveSpeechRecognitionUseCase,
     private val startSpeechRecognitionUseCase: StartSpeechRecognitionUseCase,
     private val stopSpeechRecognitionUseCase: StopSpeechRecognitionUseCase,
-    private val translateEnToRuUseCase: TranslateEnToRuUseCase
+    private val translateEnToRuUseCase: TranslateEnToRuUseCase,
 ) : BaseViewModel() {
 
     private val _uiState = MutableStateFlow(SpeechUiState())
     val uiState: StateFlow<SpeechUiState> = _uiState.asStateFlow()
+
+    private var messageIdCounter = 0L
 
     init {
         observeSpeechRecognitionUseCase()
@@ -45,28 +48,41 @@ class SpeechViewModel(
     }
 
     private fun onRecognitionEvent(event: SpeechRecognitionEvent) {
-        _uiState.update { current ->
-            when (event) {
-                SpeechRecognitionEvent.Idle -> current.copy(isListening = false)
-                SpeechRecognitionEvent.Listening -> current.copy(
-                    isListening = true,
-                    partialText = "",
-                    errorMessage = null,
+        when (event) {
+            SpeechRecognitionEvent.Idle -> _uiState.update {
+                it.copy(isListening = false)
+            }
+
+            SpeechRecognitionEvent.Listening -> _uiState.update {
+                it.copy(isListening = true, partialText = "", errorMessage = null)
+            }
+
+            is SpeechRecognitionEvent.PartialResult -> _uiState.update {
+                it.copy(isListening = true, partialText = event.text)
+            }
+
+            is SpeechRecognitionEvent.FinalResult -> {
+                if (event.text.isBlank()) return
+
+                val id = messageIdCounter++
+                val message = SpeechMessage(
+                    id = id,
+                    englishText = event.text,
+                    isTranslating = true,
                 )
-                is SpeechRecognitionEvent.PartialResult -> current.copy(
-                    isListening = true,
-                    partialText = event.text,
-                )
-                is SpeechRecognitionEvent.FinalResult -> {
-                    translateEnToRu(event.text)
-                    current.copy(
+                _uiState.update {
+                    it.copy(
                         isListening = false,
-                        recognizedText = event.text,
                         partialText = "",
+                        messages = it.messages.toPersistentList().add(message),
                         errorMessage = null,
                     )
                 }
-                is SpeechRecognitionEvent.Error -> current.copy(
+                translateEnToRu(id, event.text)
+            }
+
+            is SpeechRecognitionEvent.Error -> _uiState.update {
+                it.copy(
                     isListening = false,
                     partialText = "",
                     errorMessage = event.message,
@@ -75,31 +91,33 @@ class SpeechViewModel(
         }
     }
 
-    private fun translateEnToRu(text: String){
+    private fun translateEnToRu(messageId: Long, text: String) {
         runFlowUseCase(
             useCase = translateEnToRuUseCase,
             params = text,
-            onEach = { translatedState ->
-                when (translatedState) {
-                    is TranslateState.Success -> {
-                        _uiState.update { current ->
-                            current.copy(
-                                translatedText = translatedState.text
-                            )
-                        }
+            onEach = { state ->
+                when (state) {
+                    is TranslateState.Success -> updateMessage(messageId) {
+                        it.copy(russianText = state.text, isTranslating = false)
                     }
-                    is TranslateState.Error -> {
-                        _uiState.update { current ->
-                            current.copy(
-                                errorMessage = translatedState.message
-                            )
-                        }
+                    is TranslateState.Error -> updateMessage(messageId) {
+                        it.copy(translationError = state.message, isTranslating = false)
                     }
-                    is TranslateState.Loading -> {}
+                    is TranslateState.Loading -> Unit
                 }
-
             },
-            onError = {}
+            onError = {},
         )
+    }
+
+    private fun updateMessage(id: Long, transform: (SpeechMessage) -> SpeechMessage) {
+        _uiState.update { current ->
+            val persistent = current.messages.toPersistentList()
+            val index = persistent.indexOfFirst { it.id == id }
+            if (index == -1) current
+            else current.copy(
+                messages = persistent.set(index, transform(persistent[index])),
+            )
+        }
     }
 }
