@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -33,6 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -45,6 +47,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kholkins.englishinterlocutor.presentation.theme.AppCoral
 import com.kholkins.englishinterlocutor.presentation.theme.AppIndigo
 import com.kholkins.englishinterlocutor.presentation.theme.EnglishBubbleColor
@@ -105,6 +108,9 @@ fun SpeechScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     items(items = uiState.messages, key = { it.id }) { message ->
+                        val revealRussianText = remember(message) {
+                            { viewModel.revealRussianText(message) }
+                        }
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -115,19 +121,25 @@ fun SpeechScreen(
                             MessageBubble(
                                 text = message.englishText,
                                 label = "EN",
+                                onClick = revealRussianText,
                                 labelColor = AppIndigo,
                                 bubbleColor = EnglishBubbleColor,
                                 textColor = EnglishBubbleText,
                                 modifier = Modifier.weight(1f),
                             )
                             ArrowColumn()
-                            RightBubble(message = message, modifier = Modifier.weight(1f))
+                            RightBubble(
+                                isVisible = !message.isHiddenRightBubble,
+                                message = message,
+                                modifier = Modifier.weight(1f))
                         }
                     }
 
                     if (uiState.isListening && uiState.partialText.isNotBlank()) {
                         item(key = "partial") {
-                            PartialMessageCard(text = uiState.partialText)
+                            PartialMessageCard(
+                                text = uiState.partialText
+                            )
                         }
                     }
                 }
@@ -224,12 +236,14 @@ private fun ListeningDot(active: Boolean) {
 private fun MessageBubble(
     text: String,
     label: String,
+    onClick: () -> Unit,
     labelColor: Color,
     bubbleColor: Color,
     textColor: Color,
     modifier: Modifier = Modifier,
 ) {
     Surface(
+        onClick = onClick,
         modifier = modifier,
         color = bubbleColor,
         shape = RoundedCornerShape(18.dp),
@@ -253,9 +267,9 @@ private fun MessageBubble(
 }
 
 @Composable
-private fun RightBubble(message: SpeechMessage, modifier: Modifier = Modifier) {
+private fun RightBubble(isVisible: Boolean, message: SpeechMessage, modifier: Modifier = Modifier) {
     Surface(
-        modifier = modifier,
+        modifier = if (isVisible) modifier else modifier.alpha(0f),
         color = RussianBubbleColor,
         shape = RoundedCornerShape(18.dp),
     ) {
@@ -314,9 +328,9 @@ private fun ArrowColumn() {
 }
 
 @Composable
-private fun PartialMessageCard(text: String) {
+private fun PartialMessageCard(text: String, hidden: Boolean = false) {
     AnimatedVisibility(
-        visible = true,
+        visible = !hidden,
         enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
         exit = fadeOut(),
     ) {
@@ -328,6 +342,7 @@ private fun PartialMessageCard(text: String) {
             MessageBubble(
                 text = text,
                 label = "EN • распознаётся",
+                onClick = {},
                 labelColor = AppIndigo,
                 bubbleColor = EnglishBubbleColor.copy(alpha = 0.6f),
                 textColor = EnglishBubbleText,

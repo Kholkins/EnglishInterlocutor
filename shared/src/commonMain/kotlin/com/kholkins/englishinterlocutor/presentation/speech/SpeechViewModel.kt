@@ -2,9 +2,12 @@ package com.kholkins.englishinterlocutor.presentation.speech
 
 import androidx.lifecycle.viewModelScope
 import com.kholkins.englishinterlocutor.core.presentation.BaseViewModel
+import com.kholkins.englishinterlocutor.domain.model.AiState
 import com.kholkins.englishinterlocutor.domain.model.SpeechRecognitionEvent
 import com.kholkins.englishinterlocutor.domain.model.TranslateState
+import com.kholkins.englishinterlocutor.domain.usecase.AddAiDialogueUseCase
 import com.kholkins.englishinterlocutor.domain.usecase.ObserveSpeechRecognitionUseCase
+import com.kholkins.englishinterlocutor.domain.usecase.StartAiDialogueUseCase
 import com.kholkins.englishinterlocutor.domain.usecase.StartSpeechRecognitionUseCase
 import com.kholkins.englishinterlocutor.domain.usecase.StopSpeechRecognitionUseCase
 import com.kholkins.englishinterlocutor.domain.usecase.TranslateEnToRuUseCase
@@ -21,6 +24,8 @@ class SpeechViewModel(
     private val startSpeechRecognitionUseCase: StartSpeechRecognitionUseCase,
     private val stopSpeechRecognitionUseCase: StopSpeechRecognitionUseCase,
     private val translateEnToRuUseCase: TranslateEnToRuUseCase,
+    private val startAiDialogueUseCase: StartAiDialogueUseCase,
+    private val addAiDialogueUseCase: AddAiDialogueUseCase,
 ) : BaseViewModel() {
 
     private val _uiState = MutableStateFlow(SpeechUiState())
@@ -29,6 +34,7 @@ class SpeechViewModel(
     private var messageIdCounter = 0L
 
     init {
+        startAiDialogue()
         observeSpeechRecognitionUseCase()
             .onEach(::onRecognitionEvent)
             .launchIn(viewModelScope)
@@ -45,6 +51,18 @@ class SpeechViewModel(
     override fun onCleared() {
         stopSpeechRecognitionUseCase()
         super.onCleared()
+    }
+
+    fun revealRussianText(speechMessage:SpeechMessage){
+        if (!speechMessage.hiddenRussianText.isNullOrEmpty()){
+            updateMessage(speechMessage.id) {
+                it.copy(
+                    russianText = speechMessage.hiddenRussianText,
+                    isTranslating = false,
+                    isHiddenRightBubble = false
+                )
+            }
+        }
     }
 
     private fun onRecognitionEvent(event: SpeechRecognitionEvent) {
@@ -79,6 +97,7 @@ class SpeechViewModel(
                     )
                 }
                 translateEnToRu(id, event.text)
+                addAiDialogue(event.text)
             }
 
             is SpeechRecognitionEvent.Error -> _uiState.update {
@@ -89,6 +108,72 @@ class SpeechViewModel(
                 )
             }
         }
+    }
+
+    private fun startAiDialogue() {
+        runFlowUseCase(
+            useCase = startAiDialogueUseCase,
+            params = Unit,
+            onEach = { state ->
+                when (state) {
+                    is AiState.Success -> {
+                        val id = messageIdCounter++
+                        val listText = state.text.split("|")
+                        val message = SpeechMessage(
+                            id = id,
+                            englishText = listText[0],
+                            hiddenRussianText = listText[1],
+                            isTranslating = true,
+                            isHiddenRightBubble = true
+                        )
+                        _uiState.update {
+                            it.copy(
+                                isListening = false,
+                                partialText = "",
+                                messages = it.messages.toPersistentList().add(message),
+                                errorMessage = null
+                            )
+                        }
+                    }
+                    is AiState.Error -> {}
+                    is AiState.Loading -> Unit
+                }
+            },
+            onError = {},
+        )
+    }
+
+    private fun addAiDialogue(text: String) {
+        runFlowUseCase(
+            useCase = addAiDialogueUseCase,
+            params = text,
+            onEach = { state ->
+                when (state) {
+                    is AiState.Success -> {
+                        val id = messageIdCounter++
+                        val listText = state.text.split("|")
+                        val message = SpeechMessage(
+                            id = id,
+                            englishText = listText[0],
+                            hiddenRussianText = listText[1],
+                            isTranslating = true,
+                            isHiddenRightBubble = true
+                        )
+                        _uiState.update {
+                            it.copy(
+                                isListening = false,
+                                partialText = "",
+                                messages = it.messages.toPersistentList().add(message),
+                                errorMessage = null
+                            )
+                        }
+                    }
+                    is AiState.Error -> {}
+                    is AiState.Loading -> Unit
+                }
+            },
+            onError = {},
+        )
     }
 
     private fun translateEnToRu(messageId: Long, text: String) {
