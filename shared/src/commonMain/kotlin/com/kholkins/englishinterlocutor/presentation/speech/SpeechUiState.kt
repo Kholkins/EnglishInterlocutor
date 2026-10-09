@@ -11,12 +11,3 @@ data class SpeechUiState(
     val messages: ImmutableList<SpeechMessage> = persistentListOf(),
     val errorMessage: String? = null,
 )
-
-@Stable
-data class SpeechMessage(
-    val id: Long,
-    val englishText: String,
-    val russianText: String? = null,
-    val isTranslating: Boolean = false,
-    val translationError: String? = null,
-)
