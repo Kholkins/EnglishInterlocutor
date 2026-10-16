@@ -5,6 +5,7 @@ import com.kholkins.englishinterlocutor.core.presentation.BaseViewModel
 import com.kholkins.englishinterlocutor.domain.model.AiState
 import com.kholkins.englishinterlocutor.domain.model.SpeechRecognitionEvent
 import com.kholkins.englishinterlocutor.domain.model.TranslateState
+import com.kholkins.englishinterlocutor.domain.repository.TextToSpeechRepository
 import com.kholkins.englishinterlocutor.domain.usecase.AddAiDialogueUseCase
 import com.kholkins.englishinterlocutor.domain.usecase.ObserveSpeechRecognitionUseCase
 import com.kholkins.englishinterlocutor.domain.usecase.StartAiDialogueUseCase
@@ -18,6 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 class SpeechViewModel(
     observeSpeechRecognitionUseCase: ObserveSpeechRecognitionUseCase,
@@ -26,6 +28,7 @@ class SpeechViewModel(
     private val translateEnToRuUseCase: TranslateEnToRuUseCase,
     private val startAiDialogueUseCase: StartAiDialogueUseCase,
     private val addAiDialogueUseCase: AddAiDialogueUseCase,
+    private val textToSpeechRepository: TextToSpeechRepository,
 ) : BaseViewModel() {
 
     private val _uiState = MutableStateFlow(SpeechUiState())
@@ -50,11 +53,12 @@ class SpeechViewModel(
 
     override fun onCleared() {
         stopSpeechRecognitionUseCase()
+        textToSpeechRepository.shutdown()
         super.onCleared()
     }
 
     fun revealRussianText(speechMessage:SpeechMessage){
-        if (!speechMessage.hiddenRussianText.isNullOrEmpty()){
+        if (!speechMessage.hiddenRussianText.isNullOrEmpty()) {
             updateMessage(speechMessage.id) {
                 it.copy(
                     russianText = speechMessage.hiddenRussianText,
@@ -119,9 +123,10 @@ class SpeechViewModel(
                     is AiState.Success -> {
                         val id = messageIdCounter++
                         val listText = state.text.split("|")
+                        val englishText = listText[0]
                         val message = SpeechMessage(
                             id = id,
-                            englishText = listText[0],
+                            englishText = englishText,
                             hiddenRussianText = listText[1],
                             isTranslating = true,
                             isHiddenRightBubble = true
@@ -134,6 +139,7 @@ class SpeechViewModel(
                                 errorMessage = null
                             )
                         }
+                        speakEnglishText(englishText)
                     }
                     is AiState.Error -> {}
                     is AiState.Loading -> Unit
@@ -152,9 +158,10 @@ class SpeechViewModel(
                     is AiState.Success -> {
                         val id = messageIdCounter++
                         val listText = state.text.split("|")
+                        val englishText = listText[0]
                         val message = SpeechMessage(
                             id = id,
-                            englishText = listText[0],
+                            englishText = englishText,
                             hiddenRussianText = listText[1],
                             isTranslating = true,
                             isHiddenRightBubble = true
@@ -167,6 +174,7 @@ class SpeechViewModel(
                                 errorMessage = null
                             )
                         }
+                        speakEnglishText(englishText)
                     }
                     is AiState.Error -> {}
                     is AiState.Loading -> Unit
@@ -174,6 +182,17 @@ class SpeechViewModel(
             },
             onError = {},
         )
+    }
+
+    private fun speakEnglishText(text: String) {
+        viewModelScope.launch {
+            try {
+                textToSpeechRepository.speak(text, language = "en-US")
+            } catch (e: Exception) {
+                // TTS ошибка не должна ломать UI, просто логируем
+                e.printStackTrace()
+            }
+        }
     }
 
     private fun translateEnToRu(messageId: Long, text: String) {

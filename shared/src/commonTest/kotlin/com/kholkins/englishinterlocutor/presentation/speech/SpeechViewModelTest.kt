@@ -5,8 +5,8 @@ package com.kholkins.englishinterlocutor.presentation.speech
 import app.cash.turbine.test
 import com.kholkins.englishinterlocutor.domain.model.AiState
 import com.kholkins.englishinterlocutor.domain.model.SpeechRecognitionEvent
-import com.kholkins.englishinterlocutor.domain.model.TranslateState
 import com.kholkins.englishinterlocutor.domain.usecase.AddAiDialogueUseCase
+import com.kholkins.englishinterlocutor.domain.repository.TextToSpeechRepository
 import com.kholkins.englishinterlocutor.domain.usecase.ObserveSpeechRecognitionUseCase
 import com.kholkins.englishinterlocutor.domain.usecase.StartAiDialogueUseCase
 import com.kholkins.englishinterlocutor.domain.usecase.StartSpeechRecognitionUseCase
@@ -168,6 +168,12 @@ class SpeechViewModelTest {
             override fun stopListening() {}
         }
 
+        val mockTextToSpeechRepository = object : TextToSpeechRepository {
+            override fun speak(text: String, language: String) {}
+            override fun stop() {}
+            override fun shutdown() {}
+        }
+
         val viewModel = SpeechViewModel(
             observeSpeechRecognitionUseCase = ObserveSpeechRecognitionUseCase(speechRepository),
             startSpeechRecognitionUseCase = StartSpeechRecognitionUseCase(speechRepository),
@@ -175,6 +181,7 @@ class SpeechViewModelTest {
             translateEnToRuUseCase = TranslateEnToRuUseCase(mockTranslationRepository),
             startAiDialogueUseCase = StartAiDialogueUseCase(mockAiRepository),
             addAiDialogueUseCase = AddAiDialogueUseCase(mockAiRepository),
+            textToSpeechRepository = mockTextToSpeechRepository,
         )
 
         // Emit multiple final results
@@ -225,6 +232,12 @@ class SpeechViewModelTest {
             }
         }
 
+        val mockTextToSpeechRepository = object : TextToSpeechRepository {
+            override fun speak(text: String, language: String) {}
+            override fun stop() {}
+            override fun shutdown() {}
+        }
+
         return SpeechViewModel(
             observeSpeechRecognitionUseCase = ObserveSpeechRecognitionUseCase(speechRepository),
             startSpeechRecognitionUseCase = StartSpeechRecognitionUseCase(speechRepository),
@@ -232,6 +245,7 @@ class SpeechViewModelTest {
             translateEnToRuUseCase = TranslateEnToRuUseCase(mockTranslationRepository),
             startAiDialogueUseCase = StartAiDialogueUseCase(mockAiRepository),
             addAiDialogueUseCase = AddAiDialogueUseCase(mockAiRepository),
+            textToSpeechRepository = mockTextToSpeechRepository,
         )
     }
 }
