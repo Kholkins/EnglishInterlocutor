@@ -1,6 +1,7 @@
 package com.kholkins.englishinterlocutor.domain.usecase
 
 import com.kholkins.englishinterlocutor.core.domain.FlowUseCase
+import com.kholkins.englishinterlocutor.domain.exception.NetworkException
 import com.kholkins.englishinterlocutor.domain.model.AiState
 import com.kholkins.englishinterlocutor.domain.repository.AiRepository
 import kotlinx.coroutines.flow.Flow
@@ -16,7 +17,13 @@ class StartAiDialogueUseCase(
         ).map { result ->
             result.fold(
                 onSuccess = { AiState.Success(it) },
-                onFailure = { error -> AiState.Error(error.message ?: "Ошибка") }
+                onFailure = { error ->
+                    val userMessage = when (error) {
+                        is NetworkException -> error.userMessage
+                        else -> error.message ?: "Ошибка получения ответа"
+                    }
+                    AiState.Error(userMessage)
+                }
             )
         }
     }
