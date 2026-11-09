@@ -8,4 +8,9 @@
     <string name="translation_text_message">Здесь появится перевод</string>
     <string name="release_to_finish">Отпустите, чтобы закончить</string>
     <string name="hold_to_speak">Зажми и говори</string>
+    <string name="recognition_completed">Распознавание завершено</string>
+    <string name="yo_said">Вы сказали:</string>
+    <string name="confirm_or_try">Подтвердите или попробуйте снова</string>
+    <string name="again">Снова</string>
+    <string name="confirm">Подтвердить</string>
 </resources>

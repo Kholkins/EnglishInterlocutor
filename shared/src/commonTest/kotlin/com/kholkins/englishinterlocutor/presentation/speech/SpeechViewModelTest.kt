@@ -127,6 +127,7 @@ class SpeechViewModelTest {
             override val recognition: Flow<SpeechRecognitionEvent> = speechFlow
             override fun startListening() { startCalled = true }
             override fun stopListening() {}
+            override fun shutdown() {}
         }
 
         val viewModel = createViewModel(speechRepository = speechRepository)
@@ -142,6 +143,7 @@ class SpeechViewModelTest {
             override val recognition: Flow<SpeechRecognitionEvent> = speechFlow
             override fun startListening() {}
             override fun stopListening() { stopCalled = true }
+            override fun shutdown() {}
         }
 
         val viewModel = createViewModel(speechRepository = speechRepository)
@@ -166,6 +168,7 @@ class SpeechViewModelTest {
             override val recognition: Flow<SpeechRecognitionEvent> = speechFlow
             override fun startListening() {}
             override fun stopListening() {}
+            override fun shutdown() {}
         }
 
         val mockTextToSpeechRepository = object : TextToSpeechRepository {
@@ -176,6 +179,7 @@ class SpeechViewModelTest {
 
         val viewModel = SpeechViewModel(
             observeSpeechRecognitionUseCase = ObserveSpeechRecognitionUseCase(speechRepository),
+            speechRecognitionRepository = speechRepository,
             startSpeechRecognitionUseCase = StartSpeechRecognitionUseCase(speechRepository),
             stopSpeechRecognitionUseCase = StopSpeechRecognitionUseCase(speechRepository),
             translateEnToRuUseCase = TranslateEnToRuUseCase(mockTranslationRepository),
@@ -218,6 +222,7 @@ class SpeechViewModelTest {
                 override val recognition: Flow<SpeechRecognitionEvent> = speechFlow
                 override fun startListening() {}
                 override fun stopListening() {}
+                override fun shutdown() {}
             },
     ): SpeechViewModel {
         val mockAiRepository = object : com.kholkins.englishinterlocutor.domain.repository.AiRepository {
@@ -240,6 +245,7 @@ class SpeechViewModelTest {
 
         return SpeechViewModel(
             observeSpeechRecognitionUseCase = ObserveSpeechRecognitionUseCase(speechRepository),
+            speechRecognitionRepository = speechRepository,
             startSpeechRecognitionUseCase = StartSpeechRecognitionUseCase(speechRepository),
             stopSpeechRecognitionUseCase = StopSpeechRecognitionUseCase(speechRepository),
             translateEnToRuUseCase = TranslateEnToRuUseCase(mockTranslationRepository),
