@@ -177,6 +177,12 @@ class SpeechViewModelTest {
             override fun shutdown() {}
         }
 
+        val mockTextToSpeechRepository = object : TextToSpeechRepository {
+            override fun speak(text: String, language: String) {}
+            override fun stop() {}
+            override fun shutdown() {}
+        }
+
         val viewModel = SpeechViewModel(
             observeSpeechRecognitionUseCase = ObserveSpeechRecognitionUseCase(speechRepository),
             speechRecognitionRepository = speechRepository,
