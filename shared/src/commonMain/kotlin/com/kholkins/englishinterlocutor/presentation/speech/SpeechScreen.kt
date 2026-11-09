@@ -1,12 +1,8 @@
 package com.kholkins.englishinterlocutor.presentation.speech
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,9 +14,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeContentPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -42,12 +39,19 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
+import com.kholkins.englishinterlocutor.presentation.dialog.SpeechRecognitionConfirmationDialog
 import com.kholkins.englishinterlocutor.presentation.theme.AppCoral
 import com.kholkins.englishinterlocutor.presentation.theme.AppIndigo
 import com.kholkins.englishinterlocutor.presentation.theme.EnglishBubbleColor
@@ -69,14 +73,28 @@ fun SpeechScreen(
     viewModel: SpeechViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val confirmationState by viewModel.confirmationState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
 
     val tailCount = uiState.messages.size +
             if (uiState.isListening && uiState.partialText.isNotBlank()) 1 else 0
 
-    LaunchedEffect(tailCount) {
-        if (tailCount > 0) {
-            listState.animateScrollToItem(tailCount - 1)
+    LaunchedEffect(tailCount, uiState.partialText) {
+        if (tailCount == 0) return@LaunchedEffect
+        val lastIndex = tailCount - 1
+
+        val layoutBefore = listState.layoutInfo
+        val lastVisibleIndex = layoutBefore.visibleItemsInfo.lastOrNull()?.index ?: -1
+        if (lastVisibleIndex < lastIndex) {
+            listState.animateScrollToItem(lastIndex)
+        }
+
+        val layout = listState.layoutInfo
+        val last = layout.visibleItemsInfo.lastOrNull { it.index == lastIndex }
+            ?: return@LaunchedEffect
+        val overshoot = (last.offset + last.size) - layout.viewportEndOffset
+        if (overshoot > 0) {
+            listState.animateScrollBy(overshoot.toFloat())
         }
     }
 
@@ -84,7 +102,8 @@ fun SpeechScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .safeContentPadding(),
+            .statusBarsPadding()
+            .navigationBarsPadding()
     ) {
         FeedHeader(isListening = uiState.isListening)
 
@@ -138,7 +157,8 @@ fun SpeechScreen(
                     if (uiState.isListening && uiState.partialText.isNotBlank()) {
                         item(key = "partial") {
                             PartialMessageCard(
-                                text = uiState.partialText
+                                text = uiState.partialText,
+                                modifier = Modifier.animateItem()
                             )
                         }
                     }
@@ -164,6 +184,12 @@ fun SpeechScreen(
             onReleased = viewModel::onHoldEnd,
         )
     }
+
+    SpeechRecognitionConfirmationDialog(
+        state = confirmationState,
+        onRetry = viewModel::onRetryRecognition,
+        onConfirm = viewModel::onConfirmRecognition
+    )
 }
 
 @Composable
@@ -269,7 +295,7 @@ private fun MessageBubble(
 @Composable
 private fun RightBubble(isVisible: Boolean, message: SpeechMessage, modifier: Modifier = Modifier) {
     Surface(
-        modifier = if (isVisible) modifier else modifier.alpha(0f),
+        modifier = if (isVisible) modifier else modifier.alpha(0f).clearAndSetSemantics {},
         color = RussianBubbleColor,
         shape = RoundedCornerShape(18.dp),
     ) {
@@ -328,50 +354,47 @@ private fun ArrowColumn() {
 }
 
 @Composable
-private fun PartialMessageCard(text: String, hidden: Boolean = false) {
-    AnimatedVisibility(
-        visible = !hidden,
-        enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
-        exit = fadeOut(),
+private fun PartialMessageCard(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.Top,
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.Top,
+        MessageBubble(
+            text = text,
+            label = "EN • распознаётся",
+            onClick = {},
+            labelColor = AppIndigo,
+            bubbleColor = EnglishBubbleColor.copy(alpha = 0.6f),
+            textColor = EnglishBubbleText,
+            modifier = Modifier.weight(1f),
+        )
+        ArrowColumn()
+        Surface(
+            modifier = Modifier.weight(1f),
+            color = RussianBubbleColor.copy(alpha = 0.35f),
+            shape = RoundedCornerShape(18.dp),
         ) {
-            MessageBubble(
-                text = text,
-                label = "EN • распознаётся",
-                onClick = {},
-                labelColor = AppIndigo,
-                bubbleColor = EnglishBubbleColor.copy(alpha = 0.6f),
-                textColor = EnglishBubbleText,
-                modifier = Modifier.weight(1f),
-            )
-            ArrowColumn()
-            Surface(
-                modifier = Modifier.weight(1f),
-                color = RussianBubbleColor.copy(alpha = 0.35f),
-                shape = RoundedCornerShape(18.dp),
+            Row(
+                modifier = Modifier
+                    .heightIn(min = 62.dp)
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(
-                    modifier = Modifier
-                        .heightIn(min = 62.dp)
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                        color = AppCoral,
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = "перевод…",
-                        color = RussianBubbleText.copy(alpha = 0.6f),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp,
+                    color = AppCoral,
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "перевод…",
+                    color = RussianBubbleText.copy(alpha = 0.6f),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             }
         }
     }
@@ -411,8 +434,9 @@ private fun HoldToSpeakButton(
     onPressed: () -> Unit,
     onReleased: () -> Unit,
 ) {
-    val scale by animateFloatAsState(targetValue = if (isListening) 0.97f else 1f)
-
+    val description = stringResource(
+        if (isListening) Res.string.release_to_finish else Res.string.hold_to_speak
+    )
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -432,6 +456,14 @@ private fun HoldToSpeakButton(
                             }
                         },
                     )
+                }
+                .semantics {
+                    role = Role.Button
+                    contentDescription = description
+                    onClick(label = null) {
+                        if (isListening) onReleased() else onPressed()
+                        true
+                    }
                 },
             shape = RoundedCornerShape(28.dp),
             color = if (isListening) AppCoral else AppIndigo,
@@ -465,4 +497,22 @@ private fun HoldToSpeakButton(
             }
         }
     }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun FeedHeaderPreview() {
+    FeedHeader(true)
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun PartialMessagePreview() {
+    PartialMessageCard("text")
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun EmptyFeedPreview() {
+    EmptyFeed()
 }

@@ -5,6 +5,7 @@ import com.kholkins.englishinterlocutor.core.presentation.BaseViewModel
 import com.kholkins.englishinterlocutor.domain.model.AiState
 import com.kholkins.englishinterlocutor.domain.model.SpeechRecognitionEvent
 import com.kholkins.englishinterlocutor.domain.model.TranslateState
+import com.kholkins.englishinterlocutor.domain.repository.SpeechRecognitionRepository
 import com.kholkins.englishinterlocutor.domain.repository.TextToSpeechRepository
 import com.kholkins.englishinterlocutor.domain.usecase.AddAiDialogueUseCase
 import com.kholkins.englishinterlocutor.domain.usecase.ObserveSpeechRecognitionUseCase
@@ -12,6 +13,7 @@ import com.kholkins.englishinterlocutor.domain.usecase.StartAiDialogueUseCase
 import com.kholkins.englishinterlocutor.domain.usecase.StartSpeechRecognitionUseCase
 import com.kholkins.englishinterlocutor.domain.usecase.StopSpeechRecognitionUseCase
 import com.kholkins.englishinterlocutor.domain.usecase.TranslateEnToRuUseCase
+import com.kholkins.englishinterlocutor.presentation.dialog.SpeechRecognitionConfirmationState
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,6 +25,7 @@ import kotlinx.coroutines.launch
 
 class SpeechViewModel(
     observeSpeechRecognitionUseCase: ObserveSpeechRecognitionUseCase,
+    private val speechRecognitionRepository: SpeechRecognitionRepository,
     private val startSpeechRecognitionUseCase: StartSpeechRecognitionUseCase,
     private val stopSpeechRecognitionUseCase: StopSpeechRecognitionUseCase,
     private val translateEnToRuUseCase: TranslateEnToRuUseCase,
@@ -33,6 +36,9 @@ class SpeechViewModel(
 
     private val _uiState = MutableStateFlow(SpeechUiState())
     val uiState: StateFlow<SpeechUiState> = _uiState.asStateFlow()
+
+    private val _confirmationState = MutableStateFlow(SpeechRecognitionConfirmationState())
+    val confirmationState: StateFlow<SpeechRecognitionConfirmationState> = _confirmationState.asStateFlow()
 
     private var messageIdCounter = 0L
 
@@ -53,6 +59,7 @@ class SpeechViewModel(
 
     override fun onCleared() {
         stopSpeechRecognitionUseCase()
+        speechRecognitionRepository.shutdown()
         textToSpeechRepository.shutdown()
         super.onCleared()
     }
@@ -66,6 +73,45 @@ class SpeechViewModel(
                     isHiddenRightBubble = false
                 )
             }
+        }
+    }
+
+    fun onConfirmRecognition() {
+        _confirmationState.update { it.copy(isVisible = false) }
+
+        val text = _confirmationState.value.recognizedText
+
+        if (text.isBlank()) {
+            return
+        }
+
+        val id = messageIdCounter++
+        val message = SpeechMessage(
+            id = id,
+            englishText = text,
+            isTranslating = true,
+        )
+        _uiState.update {
+            it.copy(
+                isListening = false,
+                partialText = "",
+                messages = it.messages.toPersistentList().add(message),
+                errorMessage = null,
+            )
+        }
+
+        translateEnToRu(id, text)
+        addAiDialogue(text)
+    }
+
+    fun onRetryRecognition() {
+        _confirmationState.update { it.copy(isVisible = false) }
+        _uiState.update {
+            it.copy(
+                isListening = false,
+                partialText = "",
+                errorMessage = null,
+            )
         }
     }
 
@@ -86,22 +132,12 @@ class SpeechViewModel(
             is SpeechRecognitionEvent.FinalResult -> {
                 if (event.text.isBlank()) return
 
-                val id = messageIdCounter++
-                val message = SpeechMessage(
-                    id = id,
-                    englishText = event.text,
-                    isTranslating = true,
-                )
-                _uiState.update {
+                _confirmationState.update {
                     it.copy(
-                        isListening = false,
-                        partialText = "",
-                        messages = it.messages.toPersistentList().add(message),
-                        errorMessage = null,
+                        recognizedText = event.text,
+                        isVisible = true
                     )
                 }
-                translateEnToRu(id, event.text)
-                addAiDialogue(event.text)
             }
 
             is SpeechRecognitionEvent.Error -> _uiState.update {

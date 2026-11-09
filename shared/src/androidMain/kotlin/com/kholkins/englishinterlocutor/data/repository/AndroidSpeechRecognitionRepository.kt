@@ -136,6 +136,18 @@ class AndroidSpeechRecognitionRepository(
         }
     }
 
+    override fun shutdown() {
+        mainHandler.post {
+            wantsListening = false
+            isListening = false
+            speechRecognizer?.apply {
+                stopListening()
+                destroy()
+            }
+            speechRecognizer = null
+        }
+    }
+
     private fun emitFinal(text: String) {
         lastPartialText = ""
         if (text.isBlank()) {

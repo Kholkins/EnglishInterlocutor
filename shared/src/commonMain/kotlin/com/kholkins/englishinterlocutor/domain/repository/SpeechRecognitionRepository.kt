@@ -7,4 +7,10 @@ interface SpeechRecognitionRepository {
     val recognition: Flow<SpeechRecognitionEvent>
     fun startListening()
     fun stopListening()
+    
+    /**
+     * Освобождает ресурсы распознавания речи.
+     * Вызывается при уничтожении ViewModel/Activity.
+     */
+    fun shutdown()
 }
