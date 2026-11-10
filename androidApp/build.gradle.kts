@@ -23,13 +23,16 @@ dependencies {
 android {
     namespace = "com.kholkins.englishinterlocutor"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
+    val year = libs.versions.appYear.get().toInt()
+    val major = libs.versions.appMajor.get().toInt()
+    val minor = libs.versions.appMinor.get().toInt()
 
     defaultConfig {
         applicationId = "com.kholkins.englishinterlocutor"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = (year * 10000) + (major * 100) + minor
+        versionName = "$year.$major.$minor"
     }
     packaging {
         resources {
