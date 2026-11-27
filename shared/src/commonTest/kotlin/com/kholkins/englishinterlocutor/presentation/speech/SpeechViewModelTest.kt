@@ -2,11 +2,10 @@
 
 package com.kholkins.englishinterlocutor.presentation.speech
 
-import app.cash.turbine.test
-import com.kholkins.englishinterlocutor.domain.model.AiState
+import androidx.lifecycle.viewModelScope
 import com.kholkins.englishinterlocutor.domain.model.SpeechRecognitionEvent
-import com.kholkins.englishinterlocutor.domain.usecase.AddAiDialogueUseCase
 import com.kholkins.englishinterlocutor.domain.repository.TextToSpeechRepository
+import com.kholkins.englishinterlocutor.domain.usecase.AddAiDialogueUseCase
 import com.kholkins.englishinterlocutor.domain.usecase.ObserveSpeechRecognitionUseCase
 import com.kholkins.englishinterlocutor.domain.usecase.StartAiDialogueUseCase
 import com.kholkins.englishinterlocutor.domain.usecase.StartSpeechRecognitionUseCase
@@ -14,10 +13,11 @@ import com.kholkins.englishinterlocutor.domain.usecase.StopSpeechRecognitionUseC
 import com.kholkins.englishinterlocutor.domain.usecase.TranslateEnToRuUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -32,7 +32,8 @@ import kotlin.test.assertTrue
 
 class SpeechViewModelTest {
 
-    private val testDispatcher = StandardTestDispatcher()
+    private val testDispatcher = UnconfinedTestDispatcher()
+    private val viewModels = mutableListOf<SpeechViewModel>()
     private lateinit var speechFlow: MutableSharedFlow<SpeechRecognitionEvent>
 
     @BeforeTest
@@ -43,6 +44,10 @@ class SpeechViewModelTest {
 
     @AfterTest
     fun tearDown() {
+        // Cancel collectors launched in viewModelScope; otherwise they outlive
+        // the test and surface as UncaughtExceptionsBeforeTest in the next one.
+        viewModels.forEach { it.viewModelScope.cancel() }
+        viewModels.clear()
         Dispatchers.resetMain()
     }
 
@@ -187,6 +192,7 @@ class SpeechViewModelTest {
             addAiDialogueUseCase = AddAiDialogueUseCase(mockAiRepository),
             textToSpeechRepository = mockTextToSpeechRepository,
         )
+        viewModels += viewModel
 
         // Emit multiple final results
         speechFlow.emit(SpeechRecognitionEvent.FinalResult("First"))
@@ -225,10 +231,11 @@ class SpeechViewModelTest {
                 override fun shutdown() {}
             },
     ): SpeechViewModel {
+        // The AI dialogue flow runs on Dispatchers.IO and is not part of what these
+        // tests verify. Keep it inert so its state update cannot race with
+        // speech-recognition events under the test dispatcher.
         val mockAiRepository = object : com.kholkins.englishinterlocutor.domain.repository.AiRepository {
-            override fun sayAi(text: String): Flow<Result<String>> = flow {
-                emit(Result.success("Hello! How are you?|Привет! Как дела?"))
-            }
+            override fun sayAi(text: String): Flow<Result<String>> = flow { }
         }
 
         val mockTranslationRepository = object : com.kholkins.englishinterlocutor.domain.repository.TranslationRepository {
@@ -252,6 +259,6 @@ class SpeechViewModelTest {
             startAiDialogueUseCase = StartAiDialogueUseCase(mockAiRepository),
             addAiDialogueUseCase = AddAiDialogueUseCase(mockAiRepository),
             textToSpeechRepository = mockTextToSpeechRepository,
-        )
+        ).also { viewModels += it }
     }
 }
