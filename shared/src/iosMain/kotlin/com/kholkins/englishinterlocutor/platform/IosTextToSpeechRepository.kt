@@ -2,16 +2,12 @@ package com.kholkins.englishinterlocutor.platform
 
 import com.kholkins.englishinterlocutor.domain.repository.TextToSpeechRepository
 import kotlinx.cinterop.ExperimentalForeignApi
-import platform.AVFoundation.*
-import platform.Foundation.NSError
-import platform.Foundation.NSURL
-import kotlin.native.concurrent.SharedImmutable
+import platform.AVFAudio.*
 
 /**
  * iOS реализация TextTo Speech Repository.
- * Использует AVFoundation AVSpeechSynthesizer для озвучки.
+ * Использует AVFAudio AVSpeechSynthesizer для озвучки.
  */
-@SharedImmutable
 object IosTextToSpeechRepository : TextToSpeechRepository {
 
     private var speechSynthesizer: AVSpeechSynthesizer? = null
@@ -45,7 +41,7 @@ object IosTextToSpeechRepository : TextToSpeechRepository {
     }
 
     override fun stop() {
-        speechSynthesizer?.stopUtteranceAtBoundary(AVSpeechBoundaryImmediate)
+        speechSynthesizer?.stopSpeakingAtBoundary(AVSpeechBoundary.AVSpeechBoundaryImmediate)
     }
 
     override fun shutdown() {

@@ -1,4 +1,4 @@
-name: KMP Android CI
+name: KMP CI
 
 on:
   pull_request:
@@ -33,3 +33,22 @@ jobs:
         with:
           name: android-debug-apk
           path: androidApp/build/outputs/apk/debug/androidApp-debug.apk
+
+  ios-build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: 17
+          distribution: temurin
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      - name: Build iOS shared framework
+        run: ./gradlew :shared:linkDebugFrameworkIosSimulatorArm64

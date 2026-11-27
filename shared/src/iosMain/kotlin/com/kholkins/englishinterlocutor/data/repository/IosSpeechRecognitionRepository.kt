@@ -77,6 +77,12 @@ class IosSpeechRecognitionRepository : SpeechRecognitionRepository {
         stopAudioEngine()
     }
 
+    override fun shutdown() {
+        wantsListening = false
+        runCatching { recognitionTask?.cancel() }
+        cleanupTask()
+    }
+
     private fun startEngine() {
         if (isListening) return
         if (!wantsListening) return
