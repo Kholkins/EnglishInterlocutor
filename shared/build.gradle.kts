@@ -69,6 +69,7 @@ kotlin {
         }
         iosMain.dependencies {
             implementation(libs.ktor.ios)
+            implementation(libs.ktor.serialization)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

@@ -8,10 +8,6 @@ import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
-object NetworkConfig {
-    const val BASE_URL = "https://bba52grcblcbn5u16vih.containers.yandexcloud.net"
-}
-
 actual val platformDataModule: Module = module {
     single<SpeechRecognitionRepository> {
         AndroidSpeechRecognitionRepository(androidContext())
